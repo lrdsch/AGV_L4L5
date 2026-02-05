@@ -251,6 +251,55 @@ decision = decision_layer.get_navigation_decision(state['agv_pos'], state['agv_h
 
 ---
 
+## 📈 Metrics Validation & Testing
+
+To scientifically validate the navigation algorithms, we use `metrics_validation.py`. This script runs batch simulations to collect statistical data on performance.
+
+### `metrics_validation.py`
+
+A powerful tool for running Monte Carlo simulations (e.g., 1000 runs) to assess robustness.
+
+**Features:**
+- **🚀 Parallel Execution**: Automatically detects and uses all available CPU cores (`multiprocessing`) to drastically reduce simulation time.
+- **⚙️ Configurable**: Control `obstacles`, `runs`, and `jobs` (threads) via command line.
+- **📊 Detailed Metrics**: Calculates success rates, path efficiency, safety violations, and collision events.
+- **💾 Organized Output**: Saves results as JSON files in `metrics_output/`.
+
+**Usage:**
+
+```bash
+# Run 100 simulations with 10 obstacles using ALL available cores (Default)
+python metrics_validation.py --obstacles 10 --runs 100
+
+# Specify number of threads (e.g., 8 workers)
+python metrics_validation.py --obstacles 10 --runs 100 --jobs 8
+
+# Quick test
+python metrics_validation.py --obstacles 5 --runs 10
+```
+
+### 📋 Metrics Explained
+
+Key performance indicators (KPIs) calculated:
+
+1.  **Success Rate**: Percentage of runs reaching the goal.
+2.  **Median Path Length Ratio**: Efficiency of the path (Median value to reduce outlier impact).
+3.  **Median Time Taken**: Median time to reach the goal (successful runs only).
+4.  **Stuck Events**: Counts if the robot stays within 0.5m for > 8s.
+5.  **Obstacle Clearance**: Tracks Minimum and Average distance to nearest obstacles.
+6.  **Safety Violations**:
+    - **Warning Zone**: Distance < 0.6m
+    - **Danger Zone**: Distance < 0.3m
+    - **Collision Events**: Discrete intervals where Distance < 0.0m
+7.  **Smoothness**: Average trajectory curvature (lower is smoother).
+
+### 🛠️ Helper Files
+
+- **`testing_lines.txt`**: A reference file containing standard command-line arguments for reproducing specific test scenarios (e.g., different L3/L5 combinations or batch validation runs).
+- **`metrics_validation_single_thread.py`**: Legacy single-threaded version kept for debugging purposes.
+
+---
+
 ## 📊 Output
 
 The simulator generates logs in the `log/` directory:

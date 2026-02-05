@@ -2,4 +2,9 @@ python simulation.py --l3_path straight --l3_scenario static --l3_obstacles 15 -
 python simulation.py --l3_path straight --l3_scenario dynamic --l3_obstacles 15 --l5_navigation vo
 python simulation.py --l3_path straight --l3_scenario mixed --l3_obstacles 15 --l5_navigation vo
 
+python metrics_validation.py --obstacles 2 --runs 1000
+python metrics_validation.py --obstacles 5 --runs 1000
+python metrics_validation.py --obstacles 10 --runs 1000
+python metrics_validation.py --obstacles 20 --runs 1000
+
 

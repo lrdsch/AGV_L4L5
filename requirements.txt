@@ -13,3 +13,6 @@ scikit-learn>=1.2
 
 # Parallel processing (optional, for faster DBSCAN)
 joblib>=1.1
+
+# Data Manipulation
+pandas>=1.5
