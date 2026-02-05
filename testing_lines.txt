@@ -1,0 +1,5 @@
+python simulation.py --l3_path straight --l3_scenario static --l3_obstacles 15 --l5_navigation vo
+python simulation.py --l3_path straight --l3_scenario dynamic --l3_obstacles 15 --l5_navigation vo
+python simulation.py --l3_path straight --l3_scenario mixed --l3_obstacles 15 --l5_navigation vo
+
+

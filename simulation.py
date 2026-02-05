@@ -454,7 +454,7 @@ class SimulationController:
                 f"obstacle_log_scenario_{self.current_scenario}_{timestamp}.csv"
             )
             df.to_csv(csv_file, index=False, encoding='utf-8')
-            print(f"✅ Log saved: {csv_file}")
+            print(f"[OK] Log saved: {csv_file}")
         
         # JSON - Scientific Metrics
         json_file = os.path.join(
@@ -462,7 +462,7 @@ class SimulationController:
             f"scientific_metrics_scenario_{self.current_scenario}_{timestamp}.json"
         )
         metrics = self.scientific_metrics.export_to_json(json_file)
-        print(f"✅ Metrics saved: {json_file}")
+        print(f"[OK] Metrics saved: {json_file}")
         
         # JSON - System State
         state_file = os.path.join(
@@ -472,7 +472,7 @@ class SimulationController:
         state = self.decision.export_state()
         with open(state_file, 'w', encoding='utf-8') as f:
             json.dump(state, f, indent=2, ensure_ascii=False, default=str)
-        print(f"✅ System state saved: {state_file}")
+        print(f"[OK] System state saved: {state_file}")
         
         # Print summary
         print(f"\n{'='*60}")
@@ -501,6 +501,7 @@ class SimulationVisualizer:
         self.steps_per_frame = steps_per_frame
         self.lidar_history = deque(maxlen=30)
         self.goal_reached_drawn = False  # Track if goal reached state has been drawn
+        self.simulation_step = 0  # Track actual simulation step (not animation frame)
         
         # Setup figure
         self.fig = plt.figure(figsize=(18, 10))
@@ -535,9 +536,10 @@ class SimulationVisualizer:
         
         self.fig.canvas.mpl_connect('close_event', self._on_close)
     
-    def _on_scenario(self, scenario: int):
+    def animate(self, frame: int):
         self.controller.reset_scenario(scenario)
         self.goal_reached_drawn = False  # Reset flag when changing scenario
+        self.simulation_step = 0  # Reset step counter
     
     def _on_close(self, event):
         print("\n" + "="*60)
@@ -550,10 +552,12 @@ class SimulationVisualizer:
         # Execute simulation steps (multiple if steps_per_frame > 1)
         for _ in range(self.steps_per_frame - 1):
             # Run intermediate steps without rendering
-            self.controller.step(frame)
+            self.controller.step(self.simulation_step)
+            self.simulation_step += 1
         
         # Final step - this one we render
-        data = self.controller.step(frame)
+        data = self.controller.step(self.simulation_step)
+        self.simulation_step += 1
         
         agv_pos = data['agv_pos']
         agv_vel = data['agv_vel']
@@ -685,35 +689,33 @@ class SimulationVisualizer:
         
         # Title con info navigazione
         action_str = nav_decision.action.value
-        goal_suffix = ' ✓ GOAL REACHED' if goal_reached else ''
+        goal_suffix = ' [GOAL REACHED]' if goal_reached else ''
         self.ax_main.set_title(
             f'AGV Simulation | Scenario {self.controller.current_scenario} | Frame {display_frame}{goal_suffix}\n'
             f'Time: {current_time:.1f}s | Action: {action_str} | '
             f'Detected: {len(detected)} (S:{static_count} D:{dynamic_count})',
             fontsize=10, fontweight='bold')
         
-        # === LiDAR View ===
-        if frame % 3 == 0:
-            self.ax_lidar.clear()
-            self.ax_lidar.set_theta_zero_location('E')
-            self.ax_lidar.set_ylim(0, 16)
-            self.ax_lidar.grid(True, alpha=0.4)
-            self.ax_lidar.set_title('LIDAR POLAR VIEW', fontsize=11, fontweight='bold', pad=25)
-            
-            if self.lidar_history:
-                ranges, angles = self.lidar_history[-1]
-                step = 3
-                self.ax_lidar.scatter(angles[::step], ranges[::step],
-                                     c=ranges[::step], cmap='RdYlGn_r', s=10, alpha=0.7)
-                
-                danger_idx = ranges < 2.0
-                if np.any(danger_idx):
-                    self.ax_lidar.scatter(angles[danger_idx], ranges[danger_idx],
-                                         c='red', s=20, marker='o', alpha=0.9, zorder=10)
+        # === LiDAR View === (update every frame for sync)
+        self.ax_lidar.clear()
+        self.ax_lidar.set_theta_zero_location('E')
+        self.ax_lidar.set_ylim(0, 16)
+        self.ax_lidar.grid(True, alpha=0.4)
+        self.ax_lidar.set_title('LIDAR POLAR VIEW', fontsize=11, fontweight='bold', pad=25)
         
-        # === Distance Chart ===
-        # Only update if goal not reached OR it's the first draw after goal reached
-        should_update_deq = frame % 5 == 0 and (not goal_reached or not self.goal_reached_drawn)
+        if self.lidar_history:
+            ranges, angles = self.lidar_history[-1]
+            step = 3
+            self.ax_lidar.scatter(angles[::step], ranges[::step],
+                                 c=ranges[::step], cmap='RdYlGn_r', s=10, alpha=0.7)
+            
+            danger_idx = ranges < 2.0
+            if np.any(danger_idx):
+                self.ax_lidar.scatter(angles[danger_idx], ranges[danger_idx],
+                                     c='red', s=20, marker='o', alpha=0.9, zorder=10)
+        
+        # === Distance Chart === (update every frame for sync)
+        should_update_deq = not goal_reached or not self.goal_reached_drawn
         if should_update_deq:
             if goal_reached:
                 self.goal_reached_drawn = True
@@ -746,11 +748,11 @@ class SimulationVisualizer:
             if self.controller.deq_data and visible_obs_ids:
                 self.ax_deq.legend(loc='upper right', fontsize=7, ncol=2)
             
-            self.ax_deq.set_xlim(max(0, current_time - 10), max(10, current_time))
+            self.ax_deq.set_xlim(max(0, current_time - 10), max(10, current_time + 1))
             self.ax_deq.axhline(y=2.0, color='r', linestyle='--', linewidth=1.5, alpha=0.6)
         
-        # === Info Panel ===
-        if frame % 10 == 0:
+        # === Info Panel === (update every frame for sync)
+        if True:
             self.ax_info.clear()
             self.ax_info.axis('off')
             self.ax_info.set_xlim(0, 1)
@@ -773,7 +775,7 @@ class SimulationVisualizer:
             
             # Different title if goal reached
             if goal_reached:
-                title = f'🏁 GOAL REACHED! | L5: {algo_desc} | Path: {path_desc}'
+                title = f'[FLAG] GOAL REACHED! | L5: {algo_desc} | Path: {path_desc}'
                 title_color = '#4CAF50'
                 title_bg = '#E8F5E9'
             else:
@@ -789,7 +791,23 @@ class SimulationVisualizer:
             
             # Stats
             stats = self.controller.decision.get_statistics()
+            consensus = stats['average_confidence']
+            safety_color = 'limegreen' if consensus > 0.7 else 'orange'
+            # self.ax_main.add_patch(Circle(agv_pos, ROBOT_EFFECTIVE_RADIUS, fc='none', 
+            #                          ec=safety_color, # Use our new color
+            #                          lw=2, alpha=0.5, linestyle='--', zorder=9))
             
+            self.ax_main.add_patch(Circle(agv_pos, ROBOT_EFFECTIVE_RADIUS, 
+                            fc='none', 
+                            ec=safety_color, 
+                            lw=3.5,         # Increased thickness (from 2 to 3.5)
+                            alpha=0.9,      # Nearly opaque (from 0.5 to 0.9)
+                            linestyle='-',  # Solid line is much easier to see than dashed
+                            zorder=9))
+
+
+            fusion_consensus = stats['average_confidence'] * 100
+
             # Ground truth obstacle counts
             gt_obstacles = data['ground_truth_obstacles']
             gt_static = sum(1 for obs in gt_obstacles if obs.get('type') == 'static')
@@ -802,14 +820,24 @@ class SimulationVisualizer:
                 goal = self.controller.world.goal_pos
                 dist_to_goal = np.linalg.norm(goal - agv_pos)
                 if goal_reached:
-                    goal_info = f" | ✅ GOAL REACHED in {current_time:.1f}s"
+                    goal_info = f" | [OK] GOAL REACHED in {current_time:.1f}s"
                 else:
                     goal_info = f" | Goal: ({goal[0]:.0f},{goal[1]:.0f}) Dist: {dist_to_goal:.1f}m"
             
+            # info_lines = [
+            #     f"Time: {current_time:.1f}s  |  Frame: {display_frame}/{self.controller.steps}",
+            #     f"AGV: ({agv_pos[0]:.1f}, {agv_pos[1]:.1f}) | V={np.linalg.norm(agv_vel):.2f}m/s{goal_info}",
+            #     f"Heading: {np.rad2deg(agv_heading):.1f}°  |  Navigation: {nav_decision.action.value} | Safety: {nav_decision.safety_score:.2f}",
+            #     f"Ground Truth Obstacles: {gt_total} (Static: {gt_static}, Dynamic: {gt_dynamic})",
+            #     f"Detected: {stats['total_obstacles']} | Static: {stats['static_count']} | Dynamic: {stats['dynamic_count']}",
+            #     f"Reason: {nav_decision.reason}"
+            # ]
+
             info_lines = [
                 f"Time: {current_time:.1f}s  |  Frame: {display_frame}/{self.controller.steps}",
                 f"AGV: ({agv_pos[0]:.1f}, {agv_pos[1]:.1f}) | V={np.linalg.norm(agv_vel):.2f}m/s{goal_info}",
                 f"Heading: {np.rad2deg(agv_heading):.1f}°  |  Navigation: {nav_decision.action.value} | Safety: {nav_decision.safety_score:.2f}",
+                f"Fusion Consensus: {fusion_consensus:.1f}%  |  Reliability: {'HIGH' if fusion_consensus > 70 else 'LOW'}", # <--- NEW LINE
                 f"Ground Truth Obstacles: {gt_total} (Static: {gt_static}, Dynamic: {gt_dynamic})",
                 f"Detected: {stats['total_obstacles']} | Static: {stats['static_count']} | Dynamic: {stats['dynamic_count']}",
                 f"Reason: {nav_decision.reason}"
@@ -820,26 +848,45 @@ class SimulationVisualizer:
                 self.ax_info.text(0.05, y_pos, line, ha='left', va='top',
                                  fontsize=7.5, family='monospace')
                 y_pos -= 0.12
-            
-            # === COLLISION / DANGER WARNING ===
-            # Calculate minimum distance to any obstacle (ground truth for accuracy)
+
+            # === COLLISION COUNTER (CENTRAL RED BOX) ===
+            # Initialize collision counter and set for currently colliding obstacles
+            if not hasattr(self, 'collision_count'):
+                self.collision_count = 0
+            if not hasattr(self, 'colliding_obstacle_ids'):
+                self.colliding_obstacle_ids = set()
+
+            # Find all currently colliding obstacles (by index+1, as used in closest_obs_id)
+            current_collisions = set()
             min_distance = float('inf')
             closest_obs_id = None
             for idx, obs_gt in enumerate(gt_obstacles):
                 obs_center = np.array(obs_gt['center'])
                 obs_radius = obs_gt.get('radius', 0.3)
-                # Distance from AGV edge to obstacle edge
                 edge_distance = np.linalg.norm(agv_pos - obs_center) - ROBOT_RADIUS - obs_radius
+                if edge_distance < 0:
+                    current_collisions.add(idx + 1)
                 if edge_distance < min_distance:
                     min_distance = edge_distance
                     closest_obs_id = idx + 1
+
+            # Increment counter only for new collisions (obstacle id not in previous set)
+            new_collisions = current_collisions - self.colliding_obstacle_ids
+            self.collision_count += len(new_collisions)
+            self.colliding_obstacle_ids = current_collisions
+
+            # Draw the collision counter in a central red box
+            self.ax_info.text(0.5, 0.5, f"Collisions: {self.collision_count}",
+                              ha='center', va='center',
+                              fontsize=18, fontweight='bold', color='#FF0000',
+                              bbox=dict(boxstyle='round,pad=0.6', facecolor='#FFCCCC',
+                                        edgecolor='#FF0000', linewidth=3),
+                              zorder=100)
             
+            # === COLLISION / DANGER WARNING ===
+            # (Collision logic and min_distance now handled above for counter)
             # Display warning based on distance thresholds
             if min_distance < 0:
-                # COLLISION! (edges overlapping)
-                if not hasattr(self, 'collision_count'):
-                    self.collision_count = 0
-                self.collision_count += 1
                 warning_text = f"COLLISION! with Obstacle {closest_obs_id} (overlap: {-min_distance:.2f}m)"
                 warning_color = '#FF0000'
                 warning_bg = '#FFCCCC'
@@ -848,7 +895,6 @@ class SimulationVisualizer:
                                  bbox=dict(boxstyle='round,pad=0.4', facecolor=warning_bg,
                                           edgecolor=warning_color, linewidth=2))
             elif min_distance < NAV_CRITICAL_DISTANCE - ROBOT_EFFECTIVE_RADIUS:
-                # DANGER zone (very close)
                 warning_text = f"DANGER! Obs {closest_obs_id} at {min_distance:.2f}m"
                 warning_color = '#FF6600'
                 warning_bg = '#FFE0CC'
@@ -857,7 +903,6 @@ class SimulationVisualizer:
                                  bbox=dict(boxstyle='round,pad=0.3', facecolor=warning_bg,
                                           edgecolor=warning_color, linewidth=1.5))
             elif min_distance < NAV_SAFETY_DISTANCE - ROBOT_EFFECTIVE_RADIUS:
-                # WARNING zone (approaching)
                 warning_text = f"WARNING: Obs {closest_obs_id} at {min_distance:.2f}m"
                 warning_color = '#CC9900'
                 warning_bg = '#FFF5CC'
@@ -866,7 +911,6 @@ class SimulationVisualizer:
                                  bbox=dict(boxstyle='round,pad=0.3', facecolor=warning_bg,
                                           edgecolor=warning_color, linewidth=1))
             else:
-                # Safe - show green status with box
                 warning_text = f"SAFE - Nearest: Obs {closest_obs_id} at {min_distance:.1f}m"
                 warning_color = '#228B22'
                 warning_bg = '#E8F5E9'
@@ -1072,9 +1116,9 @@ def main():
     # Map speed to animation interval (ms) and steps per frame
     # (interval_ms, steps_per_frame)
     speed_map = {
-        'normal': (100, 1),      # 1x speed
-        'fast': (10, 1),         # 10x speed  
-        'very_fast': (1, 10)     # 100x speed (10ms interval * 10 steps)
+        'normal': (50, 1),       # ~1x real-time (accounting for rendering overhead)
+        'fast': (20, 5),         # ~5x speed (5 simulation steps per frame)
+        'very_fast': (10, 20)    # ~20x speed (20 simulation steps per frame)
     }
     interval, steps_per_frame = speed_map[args.speed]
     
