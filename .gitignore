@@ -82,4 +82,3 @@ system_state_*.json
 # Figures (if generated)
 figures/
 results/
-metrics_output/
