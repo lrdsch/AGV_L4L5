@@ -38,7 +38,7 @@ from L5_decision import (
     ObstacleState,
     NavigationAction
 )
-from L5_decision.config import ROBOT_RADIUS, ROBOT_EFFECTIVE_RADIUS, NAV_CRITICAL_DISTANCE, NAV_SAFETY_DISTANCE
+from L5_decision.config import ROBOT_RADIUS, ROBOT_EFFECTIVE_RADIUS, NAV_CRITICAL_DISTANCE, NAV_SAFETY_DISTANCE, SAFETY_MARGIN
 
 # L5 Alternative Layers
 L5_VARIANTS = {
@@ -652,6 +652,11 @@ class SimulationVisualizer:
             radius = obs_gt.get('radius', 0.3)
             self.ax_main.add_patch(Circle(center, radius, fc='lightgray', 
                                          ec='gray', lw=1, alpha=0.3, zorder=2))
+            
+            # Security Zone (Shallow) around GROUND TRUTH obstacles
+            security_margin = SAFETY_MARGIN
+            self.ax_main.add_patch(Circle(center, radius + security_margin, 
+                                         fc='none', ec='darkred', lw=1, alpha=0.3, linestyle='--', zorder=2))
             # Permanent ID number on ground truth (always visible)
             self.ax_main.text(center[0], center[1], str(idx + 1),
                              ha='center', va='center', fontsize=8, fontweight='bold',
@@ -680,6 +685,12 @@ class SimulationVisualizer:
                                   fc='purple', ec='indigo', lw=2, alpha=0.8, zorder=9)
                 self.ax_main.add_patch(arrow)
             
+            # Security Zone (Shallow) around DETECTED obstacles
+            security_margin = SAFETY_MARGIN  # Use config value
+            self.ax_main.add_patch(Circle(obs.center, getattr(obs, 'radius', 0.3) + security_margin, 
+                                         fc='none', ec=edge_color, 
+                                         lw=1, alpha=0.4, linestyle=':', zorder=7))
+            
             # State label above detected obstacle (S/D indicator)
             state_abbrev = 'S' if state_str == 'STATIC' else 'D'
             self.ax_main.text(obs.center[0], obs.center[1] + 0.7, state_abbrev,
@@ -695,6 +706,14 @@ class SimulationVisualizer:
             f'Time: {current_time:.1f}s | Action: {action_str} | '
             f'Detected: {len(detected)} (S:{static_count} D:{dynamic_count})',
             fontsize=10, fontweight='bold')
+        
+        # Legend for obstacle types
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='limegreen', edgecolor='darkgreen', label='Static'),
+            Patch(facecolor='gold', edgecolor='darkorange', label='Dynamic')
+        ]
+        self.ax_main.legend(handles=legend_elements, loc='upper left', fontsize=8)
         
         # === LiDAR View === (update every frame for sync)
         self.ax_lidar.clear()
@@ -875,12 +894,12 @@ class SimulationVisualizer:
             self.collision_count += len(new_collisions)
             self.colliding_obstacle_ids = current_collisions
 
-            # Draw the collision counter in a central red box
+            # Draw the collision counter in a smaller box, positioned lower
             self.ax_info.text(0.5, 0.5, f"Collisions: {self.collision_count}",
                               ha='center', va='center',
-                              fontsize=18, fontweight='bold', color='#FF0000',
-                              bbox=dict(boxstyle='round,pad=0.6', facecolor='#FFCCCC',
-                                        edgecolor='#FF0000', linewidth=3),
+                              fontsize=11, fontweight='bold', color='#FF0000',
+                              bbox=dict(boxstyle='round,pad=0.3', facecolor='#FFCCCC',
+                                        edgecolor='#FF0000', linewidth=2),
                               zorder=100)
             
             # === COLLISION / DANGER WARNING ===
