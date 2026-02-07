@@ -196,14 +196,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compute metrics (Single Threaded Debug Mode)")
     parser.add_argument('--obstacles', type=int, default=3)
     parser.add_argument('--runs', type=int, default=10)
+    parser.add_argument('--navigation', type=str, default='vo', choices=['vo', 'dwa', 'vfh', 'gapnav'],
+                        help='Navigation algorithm: vo (Velocity Obstacles), dwa (Dynamic Window Approach), vfh (Vector Field Histogram), gapnav (Gap Navigation)')
     args = parser.parse_args()
 
     # Simulation Integration
     scenario_map = {'static': 1, 'dynamic': 2, 'mixed': 3}
     scenarios = ['static', 'dynamic', 'mixed']
     
+    print(f"Navigation algorithm: {args.navigation.upper()}")
+    
     controller = SimulationController(
-        l5_variant='vo', 
+        l5_variant=args.navigation, 
         path_mode='straight', 
         n_obstacles=args.obstacles,
         steps=10000 # 10000 steps limit
@@ -274,7 +278,7 @@ if __name__ == "__main__":
             })
             
         metrics = compute_metrics(runs_data, 0.3)
-        filename = f"metrics_output_obstacles_{args.obstacles}_{scenario}_single.json"
+        filename = f"metrics_output_{args.navigation}_obstacles_{args.obstacles}_{scenario}_single.json"
         
         with open(os.path.join(output_dir, filename), 'w') as f:
             json.dump(metrics, f, indent=2)

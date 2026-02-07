@@ -262,9 +262,12 @@ def compute_metrics(
     }
 
 
-def run_simulation_task(scenario_name: str, scenario_id: int, n_obstacles: int, run_idx: int) -> Dict:
+def run_simulation_task(scenario_name: str, scenario_id: int, n_obstacles: int, run_idx: int, navigation: str = 'vo') -> Dict:
     """
     Worker function to run a single simulation in a separate process.
+    
+    Args:
+        navigation: Navigation algorithm variant ('vo', 'dwa', 'vfh', 'gapnav')
     """
     import sys
     import os
@@ -288,7 +291,7 @@ def run_simulation_task(scenario_name: str, scenario_id: int, n_obstacles: int, 
 
     try:
         controller = SimulationController(
-            l5_variant='vo',
+            l5_variant=navigation,
             path_mode='straight',
             n_obstacles=n_obstacles,
             steps=10000  # Increased limit to 10000 steps (1000s)
@@ -371,6 +374,8 @@ if __name__ == "__main__":
     parser.add_argument('--runs', type=int, default=10, help='Number of simulations per scenario')
     parser.add_argument('--output', type=str, default=None, help='Output file name (default: metrics_output_obstacles_<N>.json)')
     parser.add_argument('--jobs', type=int, default=None, help='Number of parallel jobs (default: all available cores)')
+    parser.add_argument('--navigation', type=str, default='vo', choices=['vo', 'dwa', 'vfh', 'gapnav'],
+                        help='Navigation algorithm: vo (Velocity Obstacles), dwa (Dynamic Window Approach), vfh (Vector Field Histogram), gapnav (Gap Navigation)')
     args = parser.parse_args()
 
     # Detect Cores
@@ -381,7 +386,8 @@ if __name__ == "__main__":
     else:
         num_cores = available_cores
         print(f"Detected {available_cores} CPU cores. Using all.")
-        
+    
+    print(f"Navigation algorithm: {args.navigation.upper()}")
     print(f"Starting parallel execution on {num_cores} workers...")
 
     # Map scenarios to simulation IDs (1: Static, 2: Dynamic, 3: Mixed)
@@ -402,7 +408,7 @@ if __name__ == "__main__":
             scenario_id = scenario_map[scenario_name]
             for i in range(args.runs):
                 futures.append(
-                    executor.submit(run_simulation_task, scenario_name, scenario_id, args.obstacles, i)
+                    executor.submit(run_simulation_task, scenario_name, scenario_id, args.obstacles, i, args.navigation)
                 )
         
         completed_count = 0
@@ -432,7 +438,7 @@ if __name__ == "__main__":
             
         metrics = compute_metrics(runs_scenario, robot_radius)
         
-        filename = f"metrics_output_obstacles_{args.obstacles}_{scenario}.json"
+        filename = f"metrics_output_{args.navigation}_obstacles_{args.obstacles}_{scenario}.json"
         if args.output:
              filename = f"{args.output}_{scenario}.json"
         

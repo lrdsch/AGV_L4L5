@@ -7,4 +7,19 @@ python metrics_validation.py --obstacles 5 --runs 1000
 python metrics_validation.py --obstacles 10 --runs 1000
 python metrics_validation.py --obstacles 20 --runs 1000
 
+python metrics_validation.py --obstacles 2 --runs 1000 --navigation vfh
+python metrics_validation.py --obstacles 5 --runs 1000 --navigation vfh
+python metrics_validation.py --obstacles 10 --runs 1000 --navigation vfh
+python metrics_validation.py --obstacles 20 --runs 1000 --navigation vfh
 
+python metrics_validation.py --obstacles 2 --runs 1000 --navigation dwa
+python metrics_validation.py --obstacles 5 --runs 1000 --navigation dwa
+python metrics_validation.py --obstacles 10 --runs 1000 --navigation dwa
+python metrics_validation.py --obstacles 20 --runs 1000 --navigation dwa
+
+python metrics_validation.py --obstacles 2 --runs 1000 --navigation gapnav
+python metrics_validation.py --obstacles 5 --runs 1000 --navigation gapnav
+python metrics_validation.py --obstacles 10 --runs 1000 --navigation gapnav
+python metrics_validation.py --obstacles 20 --runs 1000 --navigation gapnav
+
+python compare_metrics.py 
